@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тесты</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Тесты ЕНТ">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #quiz-container {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            margin-top: 0;
+            color: #1a1a1a;
+            font-size: 22px;
+            text-align: center;
+        }
+        h2 {
+            margin-top: 0;
+            color: #1a1a1a;
+            font-size: 20px;
+            line-height: 1.4;
+        }
+        .progress {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        /* Кнопки выбора темы */
+        .topic-btn {
+            display: block;
+            width: 100%;
+            padding: 14px 15px;
+            margin-bottom: 10px;
+            border: 2px solid #0d6efd;
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 16px;
+            text-align: left;
+            transition: all 0.2s ease;
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .topic-btn:hover {
+            background: #e8f0fe;
+        }
+        /* Кнопки вариантов ответа */
+        .option {
+            display: block;
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 16px;
+            text-align: left;
+            transition: all 0.2s ease;
+        }
+        .option:hover:not(.disabled) {
+            background: #f8f9fa;
+            border-color: #b3b3b3;
+        }
+        .correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+        .incorrect {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+        }
+        .disabled {
+            pointer-events: none;
+        }
+        #next-btn, #restart-btn, #back-btn {
+            margin-top: 15px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            font-weight: bold;
+        }
+        #next-btn {
+            background-color: #0d6efd;
+            color: white;
+            display: none;
+        }
+        #next-btn:hover { background-color: #0b5ed7; }
+        #restart-btn {
+            background-color: #0d6efd;
+            color: white;
+            display: none;
+        }
+        #restart-btn:hover { background-color: #0b5ed7; }
+        #back-btn {
+            background-color: #6c757d;
+            color: white;
+            display: none;
+            margin-top: 20px;
+        }
+        #back-btn:hover { background-color: #5a6268; }
+        #result-text {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="quiz-container">
+    <div class="progress" id="progress-text"></div>
+    <h2 id="question-text">Загрузка...</h2>
+    <div id="options-container"></div>
+    <button id="next-btn">Следующий вопрос</button>
+    <div id="result-text"></div>
+    <button id="restart-btn">Пройти заново</button>
+    <button id="back-btn">← Выбрать другую тему</button>
+</div>
+
+<script>
+// ============================================================
+//  Темы загружаются из папки topics/
+//  Каждый файл вызывает: registerTopic("Название", [...вопросы...])
+//
+//  Чтобы добавить новую тему:
+//  1. Создайте файл topics/moя_tema.js
+//  2. Добавьте строку: <script src="topics/moя_tema.js"> после этого блока
+// ============================================================
+const topics = {};
+
+function registerTopic(name, questions) {
+    topics[name] = questions;
+}
+</script>
+
+<!-- ============================================================
+     ПОДКЛЮЧЕНИЕ ТЕМ: добавьте новую строку для каждой новой темы
+     ============================================================ -->
+<script src="topics/chemistry_qualitative.js"></script>
+<script src="topics/example_math.js"></script>
+<script src="topics/bones.js"></script>
+<script src="topics/SlivBiology.js"></script>
+<script src="topics/SlivChimestry.js"></script>
+<script src="topics/SlivHistory.js"></script>
+
+<script>
+
+let quizQuestions = [];
+let currentQuestionIndex = 0;
+let score = 0;
+let currentTopic = null;
+
+const questionText = document.getElementById('question-text');
+const optionsContainer = document.getElementById('options-container');
+const nextBtn = document.getElementById('next-btn');
+const restartBtn = document.getElementById('restart-btn');
+const backBtn = document.getElementById('back-btn');
+const progressText = document.getElementById('progress-text');
+const resultText = document.getElementById('result-text');
+
+function shuffleArray(array) {
+    let shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+function showTopicSelection() {
+    currentTopic = null;
+    progressText.textContent = "";
+    resultText.textContent = "";
+    nextBtn.style.display = "none";
+    restartBtn.style.display = "none";
+    backBtn.style.display = "none";
+
+    questionText.textContent = "Выберите тему:";
+    optionsContainer.innerHTML = "";
+
+    Object.keys(topics).forEach(topicName => {
+        const btn = document.createElement('button');
+        btn.textContent = `${topicName} (${topics[topicName].length} вопр.)`;
+        btn.classList.add('topic-btn');
+        btn.onclick = () => startQuiz(topicName);
+        optionsContainer.appendChild(btn);
+    });
+}
+
+function startQuiz(topicName) {
+    currentTopic = topicName;
+    quizQuestions = shuffleArray(topics[topicName]);
+    currentQuestionIndex = 0;
+    score = 0;
+    resultText.textContent = "";
+    restartBtn.style.display = "none";
+    backBtn.style.display = "none";
+    loadQuestion();
+}
+
+function loadQuestion() {
+    optionsContainer.innerHTML = '';
+    nextBtn.style.display = 'none';
+
+    const current = quizQuestions[currentQuestionIndex];
+    progressText.textContent = `${currentTopic} — Вопрос ${currentQuestionIndex + 1} из ${quizQuestions.length}`;
+    questionText.textContent = current.q;
+
+    const shuffledOptions = shuffleArray(current.options);
+    shuffledOptions.forEach(optionText => {
+        const button = document.createElement('button');
+        button.textContent = optionText;
+        button.classList.add('option');
+        button.onclick = () => selectAnswer(button, optionText, current.answer);
+        optionsContainer.appendChild(button);
+    });
+}
+
+function selectAnswer(selectedButton, selectedText, correctAnswer) {
+    const allOptions = optionsContainer.querySelectorAll('.option');
+    allOptions.forEach(btn => btn.classList.add('disabled'));
+
+    if (selectedText === correctAnswer) {
+        selectedButton.classList.add('correct');
+        score++;
+    } else {
+        selectedButton.classList.add('incorrect');
+        allOptions.forEach(btn => {
+            if (btn.textContent === correctAnswer) btn.classList.add('correct');
+        });
+    }
+
+    nextBtn.style.display = 'block';
+    nextBtn.textContent = currentQuestionIndex < quizQuestions.length - 1
+        ? 'Следующий вопрос'
+        : 'Посмотреть результат';
+}
+
+nextBtn.onclick = () => {
+    if (currentQuestionIndex < quizQuestions.length - 1) {
+        currentQuestionIndex++;
+        loadQuestion();
+    } else {
+        questionText.textContent = "Тест завершен!";
+        optionsContainer.innerHTML = "";
+        nextBtn.style.display = "none";
+        progressText.textContent = "";
+        resultText.textContent = `Твой результат: ${score} из ${quizQuestions.length} правильных ответов.`;
+        restartBtn.style.display = "block";
+        backBtn.style.display = "block";
+    }
+};
+
+restartBtn.onclick = () => startQuiz(currentTopic);
+backBtn.onclick = showTopicSelection;
+
+// Старт
+showTopicSelection();
+
+// Регистрация Service Worker для офлайн-работы (PWA)
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+}
+</script>
+
+</body>
+</html>
