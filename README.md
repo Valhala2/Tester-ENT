@@ -84,6 +84,16 @@ python -m http.server 8080
 
 ---
 
+## Загрузка изменений на GitHub
+
+```bash
+git add .
+git commit -m "описание изменений"
+git push
+```
+
+---
+
 ## Добавление новой темы
 
 1. Создай файл в папке `topics/`, например `topics/math.js`:

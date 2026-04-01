@@ -132,12 +132,37 @@
             text-align: center;
             margin-top: 10px;
         }
+        #live-score {
+            display: none;
+            font-size: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 12px;
+        }
+        .score-correct {
+            background: #d4edda;
+            color: #155724;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-weight: bold;
+        }
+        .score-incorrect {
+            background: #f8d7da;
+            color: #721c24;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
 <div id="quiz-container">
     <div class="progress" id="progress-text"></div>
+    <div id="live-score">
+        <span class="score-correct" id="score-correct">✓ 0</span>
+        <span class="score-incorrect" id="score-incorrect">✗ 0</span>
+    </div>
     <h2 id="question-text">Загрузка...</h2>
     <div id="options-container"></div>
     <button id="next-btn">Следующий вопрос</button>
@@ -176,6 +201,7 @@ function registerTopic(name, questions) {
 let quizQuestions = [];
 let currentQuestionIndex = 0;
 let score = 0;
+let incorrect = 0;
 let currentTopic = null;
 
 const questionText = document.getElementById('question-text');
@@ -185,6 +211,9 @@ const restartBtn = document.getElementById('restart-btn');
 const backBtn = document.getElementById('back-btn');
 const progressText = document.getElementById('progress-text');
 const resultText = document.getElementById('result-text');
+const liveScore = document.getElementById('live-score');
+const scoreCorrect = document.getElementById('score-correct');
+const scoreIncorrect = document.getElementById('score-incorrect');
 
 function shuffleArray(array) {
     let shuffled = [...array];
@@ -202,6 +231,7 @@ function showTopicSelection() {
     nextBtn.style.display = "none";
     restartBtn.style.display = "none";
     backBtn.style.display = "none";
+    liveScore.style.display = "none";
 
     questionText.textContent = "Выберите тему:";
     optionsContainer.innerHTML = "";
@@ -220,6 +250,7 @@ function startQuiz(topicName) {
     quizQuestions = shuffleArray(topics[topicName]);
     currentQuestionIndex = 0;
     score = 0;
+    incorrect = 0;
     resultText.textContent = "";
     restartBtn.style.display = "none";
     backBtn.style.display = "none";
@@ -229,6 +260,9 @@ function startQuiz(topicName) {
 function loadQuestion() {
     optionsContainer.innerHTML = '';
     nextBtn.style.display = 'none';
+    liveScore.style.display = 'flex';
+    scoreCorrect.textContent = `✓ ${score}`;
+    scoreIncorrect.textContent = `✗ ${incorrect}`;
 
     const current = quizQuestions[currentQuestionIndex];
     progressText.textContent = `${currentTopic} — Вопрос ${currentQuestionIndex + 1} из ${quizQuestions.length}`;
@@ -251,8 +285,11 @@ function selectAnswer(selectedButton, selectedText, correctAnswer) {
     if (selectedText === correctAnswer) {
         selectedButton.classList.add('correct');
         score++;
+        scoreCorrect.textContent = `✓ ${score}`;
     } else {
         selectedButton.classList.add('incorrect');
+        incorrect++;
+        scoreIncorrect.textContent = `✗ ${incorrect}`;
         allOptions.forEach(btn => {
             if (btn.textContent === correctAnswer) btn.classList.add('correct');
         });
@@ -273,6 +310,7 @@ nextBtn.onclick = () => {
         optionsContainer.innerHTML = "";
         nextBtn.style.display = "none";
         progressText.textContent = "";
+        liveScore.style.display = "none";
         resultText.textContent = `Твой результат: ${score} из ${quizQuestions.length} правильных ответов.`;
         restartBtn.style.display = "block";
         backBtn.style.display = "block";
