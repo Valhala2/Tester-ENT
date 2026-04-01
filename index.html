@@ -97,7 +97,7 @@
         .disabled {
             pointer-events: none;
         }
-        #next-btn, #restart-btn, #back-btn {
+        #next-btn, #restart-btn, #back-btn, #show-mistakes-btn {
             margin-top: 15px;
             padding: 12px 20px;
             border: none;
@@ -126,6 +126,12 @@
             margin-top: 20px;
         }
         #back-btn:hover { background-color: #5a6268; }
+        #show-mistakes-btn {
+            background-color: #dc3545;
+            color: white;
+            display: none;
+        }
+        #show-mistakes-btn:hover { background-color: #bb2d3b; }
         #result-text {
             font-size: 18px;
             font-weight: bold;
@@ -136,8 +142,9 @@
             display: none;
             font-size: 14px;
             margin-bottom: 12px;
-            display: flex;
-            gap: 12px;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         .score-correct {
             background: #d4edda;
@@ -152,7 +159,110 @@
             border-radius: 6px;
             padding: 4px 10px;
             font-weight: bold;
+            cursor: pointer;
+            border: none;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            transition: opacity 0.2s;
         }
+        .score-incorrect:hover { opacity: 0.8; }
+
+        /* Модальное окно ошибок */
+        #mistakes-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.55);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #mistakes-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 580px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        }
+        #mistakes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        #mistakes-counter {
+            font-size: 14px;
+            color: #666;
+            font-weight: bold;
+        }
+        #mistakes-close {
+            background: none;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            color: #666;
+            line-height: 1;
+            padding: 0 4px;
+        }
+        #mistakes-close:hover { color: #1a1a1a; }
+        #modal-question {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin: 0 0 16px 0;
+            line-height: 1.4;
+        }
+        #modal-options .option {
+            pointer-events: none;
+            cursor: default;
+        }
+        #mistakes-nav {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        #modal-prev, #modal-next {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #0d6efd;
+            border-radius: 8px;
+            background: white;
+            color: #0d6efd;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        #modal-prev:hover, #modal-next:hover {
+            background: #0d6efd;
+            color: white;
+        }
+        #modal-prev:disabled, #modal-next:disabled {
+            opacity: 0.3;
+            cursor: default;
+            background: white;
+            color: #0d6efd;
+        }
+        #modal-continue {
+            display: none;
+            margin-top: 12px;
+            padding: 12px;
+            width: 100%;
+            border: none;
+            border-radius: 8px;
+            background: #28a745;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #modal-continue:hover { background: #218838; }
     </style>
 </head>
 <body>
@@ -161,14 +271,32 @@
     <div class="progress" id="progress-text"></div>
     <div id="live-score">
         <span class="score-correct" id="score-correct">✓ 0</span>
-        <span class="score-incorrect" id="score-incorrect">✗ 0</span>
+        <button class="score-incorrect" id="score-incorrect" onclick="openMistakesModal()">✗ 0</button>
     </div>
     <h2 id="question-text">Загрузка...</h2>
     <div id="options-container"></div>
     <button id="next-btn">Следующий вопрос</button>
     <div id="result-text"></div>
+    <button id="show-mistakes-btn" onclick="openMistakesModal()">Разобрать ошибки</button>
     <button id="restart-btn">Пройти заново</button>
     <button id="back-btn">← Выбрать другую тему</button>
+</div>
+
+<!-- Модальное окно ошибок -->
+<div id="mistakes-modal">
+    <div id="mistakes-card">
+        <div id="mistakes-header">
+            <span id="mistakes-counter"></span>
+            <button id="mistakes-close" onclick="closeMistakesModal()">✕</button>
+        </div>
+        <div id="modal-question"></div>
+        <div id="modal-options"></div>
+        <div id="mistakes-nav">
+            <button id="modal-prev" onclick="navigateMistake(-1)">←</button>
+            <button id="modal-next" onclick="navigateMistake(1)">→</button>
+        </div>
+        <button id="modal-continue" onclick="closeMistakesModal()">Продолжить тест →</button>
+    </div>
 </div>
 
 <script>
@@ -203,17 +331,22 @@ let currentQuestionIndex = 0;
 let score = 0;
 let incorrect = 0;
 let currentTopic = null;
+let testFinished = false;
+let incorrectAnswers = []; // {q, options, chosen, answer}
+let modalIndex = 0;
 
 const questionText = document.getElementById('question-text');
 const optionsContainer = document.getElementById('options-container');
 const nextBtn = document.getElementById('next-btn');
 const restartBtn = document.getElementById('restart-btn');
 const backBtn = document.getElementById('back-btn');
+const showMistakesBtn = document.getElementById('show-mistakes-btn');
 const progressText = document.getElementById('progress-text');
 const resultText = document.getElementById('result-text');
 const liveScore = document.getElementById('live-score');
 const scoreCorrect = document.getElementById('score-correct');
 const scoreIncorrect = document.getElementById('score-incorrect');
+const mistakesModal = document.getElementById('mistakes-modal');
 
 function shuffleArray(array) {
     let shuffled = [...array];
@@ -226,11 +359,13 @@ function shuffleArray(array) {
 
 function showTopicSelection() {
     currentTopic = null;
+    testFinished = false;
     progressText.textContent = "";
     resultText.textContent = "";
     nextBtn.style.display = "none";
     restartBtn.style.display = "none";
     backBtn.style.display = "none";
+    showMistakesBtn.style.display = "none";
     liveScore.style.display = "none";
 
     questionText.textContent = "Выберите тему:";
@@ -251,9 +386,12 @@ function startQuiz(topicName) {
     currentQuestionIndex = 0;
     score = 0;
     incorrect = 0;
+    incorrectAnswers = [];
+    testFinished = false;
     resultText.textContent = "";
     restartBtn.style.display = "none";
     backBtn.style.display = "none";
+    showMistakesBtn.style.display = "none";
     loadQuestion();
 }
 
@@ -263,6 +401,7 @@ function loadQuestion() {
     liveScore.style.display = 'flex';
     scoreCorrect.textContent = `✓ ${score}`;
     scoreIncorrect.textContent = `✗ ${incorrect}`;
+    scoreIncorrect.disabled = incorrect === 0;
 
     const current = quizQuestions[currentQuestionIndex];
     progressText.textContent = `${currentTopic} — Вопрос ${currentQuestionIndex + 1} из ${quizQuestions.length}`;
@@ -273,12 +412,12 @@ function loadQuestion() {
         const button = document.createElement('button');
         button.textContent = optionText;
         button.classList.add('option');
-        button.onclick = () => selectAnswer(button, optionText, current.answer);
+        button.onclick = () => selectAnswer(button, optionText, current.answer, shuffledOptions);
         optionsContainer.appendChild(button);
     });
 }
 
-function selectAnswer(selectedButton, selectedText, correctAnswer) {
+function selectAnswer(selectedButton, selectedText, correctAnswer, shownOptions) {
     const allOptions = optionsContainer.querySelectorAll('.option');
     allOptions.forEach(btn => btn.classList.add('disabled'));
 
@@ -290,8 +429,15 @@ function selectAnswer(selectedButton, selectedText, correctAnswer) {
         selectedButton.classList.add('incorrect');
         incorrect++;
         scoreIncorrect.textContent = `✗ ${incorrect}`;
+        scoreIncorrect.disabled = false;
         allOptions.forEach(btn => {
             if (btn.textContent === correctAnswer) btn.classList.add('correct');
+        });
+        incorrectAnswers.push({
+            q: quizQuestions[currentQuestionIndex].q,
+            options: shownOptions,
+            chosen: selectedText,
+            answer: correctAnswer
         });
     }
 
@@ -306,12 +452,16 @@ nextBtn.onclick = () => {
         currentQuestionIndex++;
         loadQuestion();
     } else {
+        testFinished = true;
         questionText.textContent = "Тест завершен!";
         optionsContainer.innerHTML = "";
         nextBtn.style.display = "none";
         progressText.textContent = "";
         liveScore.style.display = "none";
         resultText.textContent = `Твой результат: ${score} из ${quizQuestions.length} правильных ответов.`;
+        if (incorrectAnswers.length > 0) {
+            showMistakesBtn.style.display = "block";
+        }
         restartBtn.style.display = "block";
         backBtn.style.display = "block";
     }
@@ -319,6 +469,51 @@ nextBtn.onclick = () => {
 
 restartBtn.onclick = () => startQuiz(currentTopic);
 backBtn.onclick = showTopicSelection;
+
+// --- Модальное окно ошибок ---
+
+function openMistakesModal() {
+    if (incorrectAnswers.length === 0) return;
+    modalIndex = 0;
+    renderMistake();
+    mistakesModal.style.display = 'flex';
+    document.getElementById('modal-continue').style.display = testFinished ? 'none' : 'block';
+}
+
+function closeMistakesModal() {
+    mistakesModal.style.display = 'none';
+}
+
+function navigateMistake(dir) {
+    modalIndex += dir;
+    renderMistake();
+}
+
+function renderMistake() {
+    const m = incorrectAnswers[modalIndex];
+    document.getElementById('mistakes-counter').textContent =
+        `Ошибка ${modalIndex + 1} из ${incorrectAnswers.length}`;
+    document.getElementById('modal-question').textContent = m.q;
+
+    const container = document.getElementById('modal-options');
+    container.innerHTML = '';
+    m.options.forEach(optText => {
+        const btn = document.createElement('button');
+        btn.textContent = optText;
+        btn.classList.add('option', 'disabled');
+        if (optText === m.answer) btn.classList.add('correct');
+        else if (optText === m.chosen) btn.classList.add('incorrect');
+        container.appendChild(btn);
+    });
+
+    document.getElementById('modal-prev').disabled = modalIndex === 0;
+    document.getElementById('modal-next').disabled = modalIndex === incorrectAnswers.length - 1;
+}
+
+// Закрыть по клику на фон
+mistakesModal.addEventListener('click', (e) => {
+    if (e.target === mistakesModal) closeMistakesModal();
+});
 
 // Старт
 showTopicSelection();
