@@ -97,6 +97,15 @@
         .disabled {
             pointer-events: none;
         }
+        .dont-know {
+            border-color: #adb5bd !important;
+            color: #6c757d;
+            font-style: italic;
+        }
+        .dont-know:hover:not(.disabled) {
+            background: #f8f9fa;
+            border-color: #6c757d !important;
+        }
         #next-btn, #restart-btn, #back-btn, #show-mistakes-btn {
             margin-top: 15px;
             padding: 12px 20px;
@@ -412,13 +421,20 @@ function loadQuestion() {
     questionText.textContent = current.q;
 
     const shuffledOptions = shuffleArray(current.options);
+    const allOptions = [...shuffledOptions, "Не знаю"];
     shuffledOptions.forEach(optionText => {
         const button = document.createElement('button');
         button.textContent = optionText;
         button.classList.add('option');
-        button.onclick = () => selectAnswer(button, optionText, current.answer, shuffledOptions);
+        button.onclick = () => selectAnswer(button, optionText, current.answer, allOptions);
         optionsContainer.appendChild(button);
     });
+
+    const dontKnowBtn = document.createElement('button');
+    dontKnowBtn.textContent = "Не знаю";
+    dontKnowBtn.classList.add('option', 'dont-know');
+    dontKnowBtn.onclick = () => selectAnswer(dontKnowBtn, "Не знаю", current.answer, allOptions);
+    optionsContainer.appendChild(dontKnowBtn);
 }
 
 function selectAnswer(selectedButton, selectedText, correctAnswer, shownOptions) {
